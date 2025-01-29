@@ -19,12 +19,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: us-east-1
 
-      - name: Install AWS CLI (if needed)
+      - name: Install dependencies and build React app
         run: |
-          if ! command -v aws &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y awscli
-          fi
-          
+          npm install
+          npm run build
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1

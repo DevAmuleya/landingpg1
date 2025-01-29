@@ -1,25 +1,27 @@
-# Stage 1: Build the React app
+# Stage 1: Build React App
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files first (for better caching)
+# Copy package.json and package-lock.json for efficient caching
 COPY package.json package-lock.json ./
+
+# Install dependencies
 RUN npm install --frozen-lockfile
 
-# Copy the entire source code
-COPY . . 
+# Copy all project files
+COPY . .
 
-# Run the React build process
-RUN npm run build || { echo "Build failed"; exit 1; }
+# Build the React app
+RUN npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Ensure the build folder exists before copying
+# Create the directory before copying files
 RUN mkdir -p /usr/share/nginx/html
 
-# Copy built files from builder stage
+# Copy built files from the builder stage
 COPY --from=builder /app/build /usr/share/nginx/html
 
 EXPOSE 80

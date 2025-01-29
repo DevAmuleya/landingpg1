@@ -3,24 +3,25 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files first (for better caching)
 COPY package.json package-lock.json ./
 RUN npm install --frozen-lockfile
 
-# Copy the rest of the application files
-COPY . .
+# Copy the entire source code
+COPY . . 
 
-# Build the application
-RUN npm run build
+# Run the React build process
+RUN npm run build || { echo "Build failed"; exit 1; }
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Copy built files from builder stage to Nginx public folder
+# Ensure the build folder exists before copying
+RUN mkdir -p /usr/share/nginx/html
+
+# Copy built files from builder stage
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Expose port 80
 EXPOSE 80
 
-# Start Nginx server
 CMD ["nginx", "-g", "daemon off;"]

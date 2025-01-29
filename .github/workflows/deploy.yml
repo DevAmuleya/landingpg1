@@ -23,6 +23,7 @@ jobs:
         run: |
           npm install
           npm run build
+          ls -la build  # Debugging: Ensure build folder exists
 
       - name: Login to Amazon ECR
         id: login-ecr

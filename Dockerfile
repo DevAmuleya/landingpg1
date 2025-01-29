@@ -22,7 +22,7 @@ FROM nginx:alpine
 RUN mkdir -p /usr/share/nginx/html
 
 # Copy built files from the builder stage
-COPY --from=builder dist/index.html /usr/share/nginx/html
+COPY dist/index.html /usr/share/nginx/html
 
 EXPOSE 80
 

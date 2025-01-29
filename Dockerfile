@@ -3,28 +3,27 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json first to leverage Docker caching
+# Copy package.json and package-lock.json for efficient caching
 COPY package.json package-lock.json ./
 
 # Install dependencies
 RUN npm install --frozen-lockfile
 
-# Copy all source files
+# Copy all project files
 COPY . .
 
-# Ensure the build folder exists
+# Build the React app
 RUN npm run build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
 
-# Ensure directory exists before copying
+# Create the directory before copying files
 RUN mkdir -p /usr/share/nginx/html
 
-# Copy built React files from previous stage
-COPY --from=builder /app/build /usr/share/nginx/html
+# Copy built files from the builder stage
+COPY --from=builder dist/index.html /usr/share/nginx/html
 
-# Expose port 80
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

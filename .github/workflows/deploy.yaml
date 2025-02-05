@@ -1,0 +1,122 @@
+name: FF Tool CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  STACK_NAME: ECSreactStack
+  ACTION: create
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPO_NAME: react-ecr
+      ECR_REPO_URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/react-ecr
+      IMAGE_TAG: latest
+      IMAGE_SHA: ${{ github.sha }}
+      CLUSTER_NAME: react-cluster
+      SERVICE_NAME: react-service
+      TASK_FAMILY: react-task
+      CONTAINER_NAME: react-container
+      LOG_GROUP: /ecs/react-logs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies and build React app
+        run: |
+          npm install
+          npm run build
+
+      - name: Login to Amazon ECR
+        run: |
+          run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t $ECR_REPO_URI:$IMAGE_TAG -t $ECR_REPO_URI:$IMAGE_SHA .
+          docker push $ECR_REPO_URI:$IMAGE_TAG
+          docker push $ECR_REPO_URI:$IMAGE_SHA
+
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/snaptradie-app:latest
+
+      - name: Deploy CloudFormation Stack
+        run: |
+          aws cloudformation deploy \
+            --stack-name ${{ env.STACK_NAME }} \
+            --template-file cloudformation/ecs-cluster-service.yaml \
+            --capabilities CAPABILITY_NAMED_IAM
+
+      - name: Update CloudFormation stack
+        if: ${{ env.stack_exists == env.STACK_NAME && env.ACTION == 'create' }}
+        run: |
+          echo "Updating CloudFormation stack..."
+          # Use 'set +e' to ignore the error and proceed to handle it manually
+          set +e
+          aws cloudformation update-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --template-body file://cloudformation/ecs-cluster-service.yaml\
+            --capabilities CAPABILITY_NAMED_IAM
+
+          if [ $? -ne 0 ]; then
+            echo "No updates are needed or an error occurred during the update."
+            # Optionally handle the error or take alternative actions
+          fi
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs register-task-definition \
+            --family $TASK_FAMILY \
+            --requires-compatibilities FARGATE \
+            --network-mode awsvpc \
+            --task-role-arn arn:aws:iam::$AWS_ACCOUNT_ID:role/ECSExecutionRole \
+            --execution-role-arn arn:aws:iam::$AWS_ACCOUNT_ID:role/ECSExecutionRole \
+            --memory "8192" \
+            --cpu "4096" \
+            --container-definitions '[
+              {
+                "name": "'$CONTAINER_NAME'",
+                "image": "'$ECR_REPO_URI':'$IMAGE_SHA'",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 3000,
+                    "protocol": "tcp"
+                  }
+                ],
+                "logConfiguration": {
+                  "logDriver": "awslogs",
+                  "options": {
+                    "awslogs-group": "'$LOG_GROUP'",
+                    "awslogs-region": "'$AWS_REGION'",
+                    "awslogs-stream-prefix": "ecs"
+                  }
+                }
+              }
+            ]'
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --output json

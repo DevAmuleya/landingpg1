@@ -52,11 +52,6 @@ jobs:
           docker push $ECR_REPO_URI:$IMAGE_TAG
           docker push $ECR_REPO_URI:$IMAGE_SHA
 
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/snaptradie-app:latest
-
       - name: Deploy CloudFormation Stack
         run: |
           aws cloudformation deploy \

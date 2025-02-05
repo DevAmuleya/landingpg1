@@ -43,9 +43,8 @@ jobs:
           npm run build
 
       - name: Login to Amazon ECR
-        run: |
-          run: |
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
         run: |

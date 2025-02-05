@@ -210,8 +210,9 @@ Resources:
             Ref: TargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnet:
+          Subnets:
             - !Ref Subnet
+            - !Ref Subnet2
           SecurityGroups:
             - !Ref ECSSecurityGroup
           AssignPublicIp: ENABLED

@@ -56,7 +56,7 @@ jobs:
         run: |
           aws cloudformation deploy \
             --stack-name ${{ env.STACK_NAME }} \
-            --template-file cloudformation/ecs-cluster-service.yaml \
+            --template-file cloudformation/ecs_cluster.yaml \
             --capabilities CAPABILITY_NAMED_IAM
 
       - name: Update CloudFormation stack
@@ -67,7 +67,7 @@ jobs:
           set +e
           aws cloudformation update-stack \
             --stack-name ${{ env.STACK_NAME }} \
-            --template-body file://cloudformation/ecs-cluster-service.yaml\
+            --template-body file://cloudformation/ecs_cluster.yaml\
             --capabilities CAPABILITY_NAMED_IAM
 
           if [ $? -ne 0 ]; then

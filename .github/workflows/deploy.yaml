@@ -52,27 +52,53 @@ jobs:
           docker push $ECR_REPO_URI:$IMAGE_TAG
           docker push $ECR_REPO_URI:$IMAGE_SHA
 
-      - name: Deploy CloudFormation Stack
+      - name: Deploy or Update CloudFormation Stack
         run: |
-          aws cloudformation deploy \
-            --stack-name ${{ env.STACK_NAME }} \
-            --template-file cloudformation/ecs_cluster.yaml \
-            --capabilities CAPABILITY_NAMED_IAM
+          echo "Checking CloudFormation stack status..."
+          
+          # Get stack status
+          STACK_STATUS=$(aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NOT_FOUND")
 
-      - name: Update CloudFormation stack
-        if: ${{ env.stack_exists == env.STACK_NAME && env.ACTION == 'create' }}
-        run: |
-          echo "Updating CloudFormation stack..."
-          # Use 'set +e' to ignore the error and proceed to handle it manually
-          set +e
-          aws cloudformation update-stack \
-            --stack-name ${{ env.STACK_NAME }} \
-            --template-body file://cloudformation/ecs_cluster.yaml\
-            --capabilities CAPABILITY_NAMED_IAM
+          if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]]; then
+            echo "Stack is in ROLLBACK_COMPLETE state. Deleting it..."
+            aws cloudformation delete-stack --stack-name ${{ env.STACK_NAME }}
+            
+            echo "Waiting for stack deletion..."
+            aws cloudformation wait stack-delete-complete --stack-name ${{ env.STACK_NAME }}
+            
+            echo "Stack deleted. Proceeding with new deployment..."
+            aws cloudformation create-stack \
+              --stack-name ${{ env.STACK_NAME }} \
+              --template-body file://cloudformation/ecs_cluster.yaml \
+              --capabilities CAPABILITY_NAMED_IAM
+            
+            echo "Waiting for stack creation to complete..."
+            aws cloudformation wait stack-create-complete --stack-name ${{ env.STACK_NAME }}
+          
+          elif [[ "$STACK_STATUS" == "NOT_FOUND" ]]; then
+            echo "Stack does not exist. Creating a new stack..."
+            aws cloudformation create-stack \
+              --stack-name ${{ env.STACK_NAME }} \
+              --template-body file://cloudformation/ecs_cluster.yaml \
+              --capabilities CAPABILITY_NAMED_IAM
+            
+            echo "Waiting for stack creation to complete..."
+            aws cloudformation wait stack-create-complete --stack-name ${{ env.STACK_NAME }}
 
-          if [ $? -ne 0 ]; then
-            echo "No updates are needed or an error occurred during the update."
-            # Optionally handle the error or take alternative actions
+          else
+            echo "Stack exists and is in a valid state ($STACK_STATUS). Attempting update..."
+            set +e
+            aws cloudformation update-stack \
+              --stack-name ${{ env.STACK_NAME }} \
+              --template-body file://cloudformation/ecs_cluster.yaml \
+              --capabilities CAPABILITY_NAMED_IAM
+
+            if [ $? -eq 0 ]; then
+              echo "Update initiated successfully. Waiting for completion..."
+              aws cloudformation wait stack-update-complete --stack-name ${{ env.STACK_NAME }}
+            else
+              echo "No updates are needed or an error occurred."
+            fi
           fi
 
       - name: Deploy to ECS

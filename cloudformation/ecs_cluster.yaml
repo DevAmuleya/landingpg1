@@ -57,6 +57,7 @@ Resources:
               HostPort: 80
               Protocol: tcp
       Cpu: 256
+      ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn 
       TaskRoleArn: !GetAtt ECSExecutionRole.Arn  # Corrected ExecutionRoleArn to TaskRoleArn
       Family: task-definition-cfn
       Memory: 512

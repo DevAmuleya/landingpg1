@@ -43,9 +43,9 @@ Resources:
   ECSLogGroup:
     Type: 'AWS::Logs::LogGroup'
     Properties:
-      LogGroupName: /ecs/fargate-task-definition  # Ensure this matches the log group in your ECS task
-      RetentionInDays: 30  # Optional: Set log retention period
-  
+      LogGroupName: /ecs/fargate-task-definition
+      RetentionInDays: 30  
+
   ECSTaskDefinition:
     Type: 'AWS::ECS::TaskDefinition'
     Properties:
@@ -64,7 +64,7 @@ Resources:
               Protocol: tcp
       Cpu: 256
       ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn 
-      TaskRoleArn: !GetAtt ECSExecutionRole.Arn  # Corrected ExecutionRoleArn to TaskRoleArn
+      TaskRoleArn: !GetAtt ECSExecutionRole.Arn  
       Family: task-definition-cfn
       Memory: 512
       NetworkMode: awsvpc

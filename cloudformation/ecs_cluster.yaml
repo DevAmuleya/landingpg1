@@ -42,6 +42,13 @@ Resources:
       SecurityGroupIngress:
         - CidrIp: '0.0.0.0/0'  # Allow outbound traffic to anywhere
         - IpProtocol: '-1'  # All traffic
+  
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '0.0.0.0/0'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
 
   # Define the Subnet (in the default VPC and in an AZ)
   MySubnet:
@@ -49,7 +56,7 @@ Resources:
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']  # Choose the first AZ
       CidrBlock: '10.0.1.0/24'  # Subnet CIDR block
-      VpcId: !Ref DefaultVPC  # Reference to the default VPC
+      VpcId: !Ref VPC  # Reference to the default VPC
 
   ECSService:
     Type: 'AWS::ECS::Service'

@@ -73,6 +73,34 @@ Resources:
       RuntimePlatform:
         OperatingSystemFamily: LINUX
 
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  MySubnet:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: '10.0.1.0/24'
+      VpcId: !Ref VPC
+
+  # Added NAT Gateway for private subnet internet access
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyInternetGateway
+
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
   MySecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -86,20 +114,6 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: '0.0.0.0/0'  
-
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: '10.0.0.0/16'
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-
-  MySubnet:
-    Type: 'AWS::EC2::Subnet'
-    Properties:
-      AvailabilityZone: !Select [0, !GetAZs '']
-      CidrBlock: '10.0.1.0/24'
-      VpcId: !Ref VPC 
 
   ECSUpdateServiceRole:
     Type: AWS::IAM::Role
@@ -145,6 +159,6 @@ Resources:
           SecurityGroups:
             - !Ref MySecurityGroup  
           Subnets:
-            - !Ref MySubnet  
+            - !Ref MySubnet
       TaskDefinition: !Ref ECSTaskDefinition
       Role: !GetAtt ECSUpdateServiceRole.Arn

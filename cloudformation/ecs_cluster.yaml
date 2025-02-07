@@ -36,6 +36,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: 'Allow inbound HTTP traffic'
+      VpcId: !Ref VPC
       SecurityGroupEgress:
         - CidrIp: '0.0.0.0/0'  # Allow outbound traffic to anywhere
         - IpProtocol: '-1'  # All traffic

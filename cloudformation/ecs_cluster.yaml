@@ -3,7 +3,7 @@ Resources:
   ECSCluster:
     Type: 'AWS::ECS::Cluster'
     Properties:
-      ClusterName: NewCluster
+      ClusterName: react-cluster
 
   ECSExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -104,7 +104,7 @@ Resources:
   ECSService:
     Type: 'AWS::ECS::Service'
     Properties:
-      ServiceName: cfn-service
+      ServiceName: react-service
       Cluster: !Ref ECSCluster
       DesiredCount: 1
       LaunchType: FARGATE

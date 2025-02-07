@@ -19,8 +19,8 @@ jobs:
       ECR_REPO_URI: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/react-ecr
       IMAGE_TAG: latest
       IMAGE_SHA: ${{ github.sha }}
-      CLUSTER_NAME: react-cluster
-      SERVICE_NAME: react-service
+      CLUSTER_NAME: NewCluster
+      SERVICE_NAME: cfn-service
       TASK_FAMILY: react-task
       CONTAINER_NAME: react-container
       LOG_GROUP: /ecs/react-logs

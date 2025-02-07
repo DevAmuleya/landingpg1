@@ -5,11 +5,46 @@ Resources:
     Properties:
       ClusterName: NewCluster
 
+  ECSExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: ECSExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Policies:
+        - PolicyName: ECSExecutionCustomPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:DescribeRepositories'
+                  - 'ecr:ListImages'
+                  - 'ecr:BatchGetImage'
+                Resource: '*'  
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/*'  
+
   ECSTaskDefinition:
     Type: 'AWS::ECS::TaskDefinition'
     Properties:
       ContainerDefinitions:
-        - Image: 'public.ecr.aws/docker/library/httpd:2.4'
+        - Image: '905418110363.dkr.ecr.us-east-1.amazonaws.com/react-ecr'
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -22,7 +57,7 @@ Resources:
               HostPort: 80
               Protocol: tcp
       Cpu: 256
-      ExecutionRoleArn: 'arn:aws:iam::111122223333:role/ecsTaskExecutionRole'
+      TaskRoleArn: !GetAtt ECSExecutionRole.Arn  # Corrected ExecutionRoleArn to TaskRoleArn
       Family: task-definition-cfn
       Memory: 512
       NetworkMode: awsvpc
@@ -30,7 +65,6 @@ Resources:
         - FARGATE
       RuntimePlatform:
         OperatingSystemFamily: LINUX
-    # Define the Security Group
 
   MySecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -38,12 +72,14 @@ Resources:
       GroupDescription: 'Allow inbound HTTP traffic'
       VpcId: !Ref VPC
       SecurityGroupEgress:
-        - CidrIp: '0.0.0.0/0'  # Allow outbound traffic to anywhere
-        - IpProtocol: '-1'  # All traffic
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'  
       SecurityGroupIngress:
-        - CidrIp: '0.0.0.0/0'  # Allow outbound traffic to anywhere
-        - IpProtocol: '-1'  # All traffic
-  
+        - IpProtocol: 'tcp'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'  
+
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -51,13 +87,12 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
 
-  # Define the Subnet (in the default VPC and in an AZ)
   MySubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
-      AvailabilityZone: !Select [0, !GetAZs '']  # Choose the first AZ
-      CidrBlock: '10.0.1.0/24'  # Subnet CIDR block
-      VpcId: !Ref VPC  # Reference to the default VPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: '10.0.1.0/24'
+      VpcId: !Ref VPC  
 
   ECSService:
     Type: 'AWS::ECS::Service'
@@ -70,7 +105,7 @@ Resources:
         AwsvpcConfiguration:
           AssignPublicIp: ENABLED
           SecurityGroups:
-            - !Ref MySecurityGroup  # Reference to the defined Security Group
+            - !Ref MySecurityGroup  
           Subnets:
-            - !Ref MySubnet  # Reference to the defined Subnet
+            - !Ref MySubnet  
       TaskDefinition: !Ref ECSTaskDefinition

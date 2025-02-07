@@ -38,7 +38,8 @@ Resources:
                 Action:
                   - 'logs:CreateLogStream'
                   - 'logs:PutLogEvents'
-                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/ecs/*'  
+                Resource: '*'  
+
   ECSLogGroup:
     Type: 'AWS::Logs::LogGroup'
     Properties:
@@ -49,7 +50,7 @@ Resources:
     Type: 'AWS::ECS::TaskDefinition'
     Properties:
       ContainerDefinitions:
-        - Image: '905418110363.dkr.ecr.us-east-1.amazonaws.com/react-ecr'
+        - Image: '905418110363.dkr.ecr.us-east-1.amazonaws.com/react-ecr:latest'
           LogConfiguration:
             LogDriver: awslogs
             Options:

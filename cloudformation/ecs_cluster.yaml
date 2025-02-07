@@ -3,7 +3,7 @@ Resources:
   ECSCluster:
     Type: 'AWS::ECS::Cluster'
     Properties:
-      ClusterName: react-cluster
+      ClusterName: NewCluster
 
   ECSExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -99,12 +99,43 @@ Resources:
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: '10.0.1.0/24'
-      VpcId: !Ref VPC  
+      VpcId: !Ref VPC 
+
+  ECSUpdateServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Principal:
+              Service: "ecs.amazonaws.com"
+      Policies:
+        - PolicyName: "ECSUpdateServicePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "ecs:DescribeClusters"
+                  - "ecs:UpdateService"
+                  - "ecs:DescribeServices"
+                  - "ecs:ListTasks"
+                  - "ecs:DescribeTaskDefinition"
+                  - "ecs:ListClusters"
+                Resource: "*"
+              - Effect: "Allow"
+                Action:
+                  - "logs:DescribeLogStreams"
+                  - "logs:GetLogEvents"
+                  - "logs:FilterLogEvents"
+                Resource: "*" 
 
   ECSService:
     Type: 'AWS::ECS::Service'
     Properties:
-      ServiceName: react-service
+      ServiceName: cfn-service
       Cluster: !Ref ECSCluster
       DesiredCount: 1
       LaunchType: FARGATE
@@ -116,3 +147,4 @@ Resources:
           Subnets:
             - !Ref MySubnet  
       TaskDefinition: !Ref ECSTaskDefinition
+      Role: !GetAtt ECSUpdateServiceRole.Arn

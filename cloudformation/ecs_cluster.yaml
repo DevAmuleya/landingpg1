@@ -35,9 +35,7 @@ Resources:
                   - 'ecr:BatchGetImage'
                 Resource: '*'  
               - Effect: Allow
-                Action:
-                  - 'logs:CreateLogStream'
-                  - 'logs:PutLogEvents'
+                Action: 'logs:*' 
                 Resource: '*'  
 
   ECSLogGroup:
@@ -57,10 +55,10 @@ Resources:
               awslogs-group: /ecs/fargate-task-definition2
               awslogs-region: us-east-1
               awslogs-stream-prefix: ecs
-          Name: sample-fargate-app2
+          Name: reactContainer
           PortMappings:
-            - ContainerPort: 80
-              HostPort: 80
+            - ContainerPort: 3000
+              HostPort: 3000
               Protocol: tcp
       Cpu: 256
       ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn 
@@ -81,14 +79,22 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
 
-  # Create a Public Subnet
-  MySubnet:
-    Type: 'AWS::EC2::Subnet'
+  # Subnet for ECS Tasks
+  Subnet:
+    Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [0, !GetAZs '']
-      CidrBlock: '10.0.1.0/24'
       VpcId: !Ref VPC
-      MapPublicIpOnLaunch: true  # Ensure the subnet is public
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: 'true'
+
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      MapPublicIpOnLaunch: 'true'
 
   # Create Internet Gateway
   InternetGateway:
@@ -100,52 +106,125 @@ Resources:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  # Route Table to Enable Internet Access
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable 
 
-  InternetRoute:
+  PublicRoute:
     Type: AWS::EC2::Route
-    DependsOn: AttachGateway
     Properties:
       RouteTableId: !Ref RouteTable
-      DestinationCidrBlock: "0.0.0.0/0"
+      DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  SubnetRouteTableAssociation:
+  SubnetRouteTableAssociation1:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref MySubnet
+      SubnetId: !Ref Subnet
       RouteTableId: !Ref RouteTable
 
-  MySecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
+  SubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      GroupDescription: 'Allow inbound HTTP traffic'
-      VpcId: !Ref VPC
-      SecurityGroupEgress:
-        - IpProtocol: '-1'
-          CidrIp: '0.0.0.0/0'  
-      SecurityGroupIngress:
-        - IpProtocol: 'tcp'
-          FromPort: 80
-          ToPort: 80
-          CidrIp: '0.0.0.0/0'  
+      SubnetId: !Ref Subnet2
+      RouteTableId: !Ref RouteTable
 
-  ECSService:
-    Type: 'AWS::ECS::Service'
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      ServiceName: cfn-service
+      GroupDescription: Allow HTTP and HTTPS traffic to ECS Task
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '3000'
+          ToPort: '3000'
+          CidrIp: 0.0.0.0/0  
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0 
+
+    # Application Load Balancer
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: snaptradieALB
+      Subnets:
+        - !Ref Subnet
+        - !Ref Subnet2
+      SecurityGroups:
+        - Ref: ECSSecurityGroup
+      Scheme: internet-facing
+
+    # Target Group for ALB
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: reactTargetGroup
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref VPC
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+
+    # ALB Listener
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+  # ECS Service Load Balancer Integration
+  ECSServiceLoadBalancer:
+    Type: AWS::ECS::Service
+    Properties:
       Cluster: !Ref ECSCluster
+      ServiceName: cfn-service
+      TaskDefinition: !Ref ECSTaskDefinition
       DesiredCount: 1
       LaunchType: FARGATE
+      HealthCheckGracePeriodSeconds: 5
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      LoadBalancers:
+        - ContainerName: reactContainer
+          ContainerPort: 3000
+          TargetGroupArn:
+            Ref: TargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: ENABLED
-          SecurityGroups:
-            - !Ref MySecurityGroup  
           Subnets:
-            - !Ref MySubnet  
-      TaskDefinition: !Ref ECSTaskDefinition
+            - !Ref Subnet
+            - !Ref Subnet
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          AssignPublicIp: ENABLED
+    DependsOn:
+      - ALBListener    
+
+Outputs:
+  ALBURL:
+    Description: "URL of the Application Load Balancer"
+    Value: !Join 
+      - ""
+      - - "http://"
+        - !GetAtt ALB.DNSName
+

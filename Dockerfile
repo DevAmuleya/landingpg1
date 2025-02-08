@@ -20,7 +20,7 @@ RUN npm run build
 RUN npm install -g serve
 
 # Expose the port (default for serve)
-EXPOSE 3000
+EXPOSE 80
 
 # Command to run the app in production mode
 CMD ["serve", "-s", "dist"]

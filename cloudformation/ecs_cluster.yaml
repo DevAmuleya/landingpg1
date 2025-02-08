@@ -73,6 +73,7 @@ Resources:
       RuntimePlatform:
         OperatingSystemFamily: LINUX
 
+  # Define VPC
   VPC:
     Type: 'AWS::EC2::VPC'
     Properties:
@@ -80,26 +81,44 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
 
+  # Create a Public Subnet
   MySubnet:
     Type: 'AWS::EC2::Subnet'
     Properties:
       AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: '10.0.1.0/24'
       VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true  # Ensure the subnet is public
 
-  # Added NAT Gateway for private subnet internet access
+  # Create Internet Gateway
   InternetGateway:
     Type: 'AWS::EC2::InternetGateway'
-    Properties:
-      Tags:
-        - Key: Name
-          Value: MyInternetGateway
 
   AttachGateway:
     Type: 'AWS::EC2::VPCGatewayAttachment'
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
+
+  # Route Table to Enable Internet Access
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MySubnet
+      RouteTableId: !Ref RouteTable
 
   MySecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -115,37 +134,6 @@ Resources:
           ToPort: 80
           CidrIp: '0.0.0.0/0'  
 
-  ECSUpdateServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: "Allow"
-            Action: "sts:AssumeRole"
-            Principal:
-              Service: "ecs.amazonaws.com"
-      Policies:
-        - PolicyName: "ECSUpdateServicePolicy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: "Allow"
-                Action:
-                  - "ecs:DescribeClusters"
-                  - "ecs:UpdateService"
-                  - "ecs:DescribeServices"
-                  - "ecs:ListTasks"
-                  - "ecs:DescribeTaskDefinition"
-                  - "ecs:ListClusters"
-                Resource: "*"
-              - Effect: "Allow"
-                Action:
-                  - "logs:DescribeLogStreams"
-                  - "logs:GetLogEvents"
-                  - "logs:FilterLogEvents"
-                Resource: "*" 
-
   ECSService:
     Type: 'AWS::ECS::Service'
     Properties:
@@ -159,6 +147,5 @@ Resources:
           SecurityGroups:
             - !Ref MySecurityGroup  
           Subnets:
-            - !Ref MySubnet
+            - !Ref MySubnet  
       TaskDefinition: !Ref ECSTaskDefinition
-      Role: !GetAtt ECSUpdateServiceRole.Arn

@@ -43,7 +43,7 @@ Resources:
   ECSLogGroup:
     Type: 'AWS::Logs::LogGroup'
     Properties:
-      LogGroupName: /ecs/fargate-task-definition
+      LogGroupName: /ecs/fargate-task-definition2
       RetentionInDays: 30  
 
   ECSTaskDefinition:
@@ -54,10 +54,10 @@ Resources:
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: /ecs/fargate-task-definition
+              awslogs-group: /ecs/fargate-task-definition2
               awslogs-region: us-east-1
               awslogs-stream-prefix: ecs
-          Name: sample-fargate-app
+          Name: sample-fargate-app2
           PortMappings:
             - ContainerPort: 80
               HostPort: 80

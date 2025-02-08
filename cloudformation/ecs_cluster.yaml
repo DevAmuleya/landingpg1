@@ -152,7 +152,7 @@ Resources:
           ToPort: '443'
           CidrIp: 0.0.0.0/0 
 
-    # Application Load Balancer
+  # Application Load Balancer
   ALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -164,7 +164,7 @@ Resources:
         - Ref: ECSSecurityGroup
       Scheme: internet-facing
 
-    # Target Group for ALB
+  # Target Group for ALB
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -180,7 +180,7 @@ Resources:
       HealthyThresholdCount: 3
       UnhealthyThresholdCount: 3
 
-    # ALB Listener
+  # ALB Listener
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -213,7 +213,7 @@ Resources:
         AwsvpcConfiguration:
           Subnets:
             - !Ref Subnet
-            - !Ref Subnet
+            - !Ref Subnet2
           SecurityGroups:
             - !Ref ECSSecurityGroup
           AssignPublicIp: ENABLED
@@ -227,4 +227,3 @@ Outputs:
       - ""
       - - "http://"
         - !GetAtt ALB.DNSName
-
